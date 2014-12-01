@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<script>
+
+Math.seed = 26;
+
+Math.seededRandom = function (max, min)
+{
+    max = max || 1;
+    min = min || 0;
+
+    Math.seed = (Math.seed * 9301 + 49297) % 233280;
+    var rnd = Math.seed / 233280;
+
+    return min + rnd * (max - min);
+}
+
+</script>
+<script>
+
+function cellClickHandler()
+{
+	var x = this.x;
+	var y = this.y;
+	var blacked = !getBlacked(x, y);
+	setBlacked(x, y, blacked);
+	this.classList.toggle('blacked', blacked);
+	updateRev();
+}
+
+function countFollowers(x1, y1, dir)
+{
+    var result = 0;
+    for (var x = x1 - 1; x <= x1 + 1; ++x)
+    for (var y = y1 - 1; y <= y1 + 1; ++y)
+    if (getDir(x, y) == dir) ++result;
+    return result;
+}
+
+function get(x, y, prop)
+{
+    var index = (x + 10) % 10 + (y + 10) % 10 * 10;
+    return t[index][prop];
+}
+
+function getBlacked(x, y)
+{
+    return get(x, y, 'blacked');
+}
+
+function getColNum(x, y)
+{
+    return get(x, y, 'colNum');
+}
+
+function getDir(x, y)
+{
+    return get(x, y, 'dir');
+}
+
+function getPal(x, y)
+{
+    return get(x, y, 'pal');
+}
+
+function getStep(x, y)
+{
+    var index = (x + 10) % 10 + (y + 10) % 10 * 10;
+    var slot = t[index];
+    if (slot.step == null)
+    {
+        var dir = slot.dir;
+        slot.step = countFollowers(x, y, dir);
+    }
+    return slot.step;
+}
+
+function make()
+{
+	document.querySelector('INPUT').addEventListener(
+		'change',
+		function ()
+		{
+			var checked = this.checked;
+			pic.classList.toggle('withCount', checked);
+		}
+	);
+    for (var r = 0; r < 100; ++r) t[r] = { dir: Math.seededRandom(2) < 1 };
+    for (var y = 0; y < 10; ++y)
+    {
+        var palette = [];
+        for (var x = 0; x < 10; ++x)
+        {
+            var colNum = paint(x, y, x);
+            if (palette[colNum] == null)
+            {
+                if (Object.keys(palette).length >= 4)
+                {
+                    alert("ERROR");
+                    return;
+                }
+                do
+                {
+                    var pal = Math.seededRandom(4) ^ 0;
+                }
+                while (palette.indexOf(pal) >= 0);
+                palette[colNum] = pal;
+            }
+            setPal(x, y, palette[colNum]);
+        }
+    }
+    for (var y = 0; y < 10; ++y)
+    {
+        var row = pic.appendChild(document.createElement('DIV'));
+        for (var x = 0; x < 10; ++x)
+        {
+            var span = row.appendChild(document.createElement('SPAN'));
+            var dir = getDir(x, y);
+            var step = getStep(x, y);
+            var pal = getPal(x, y);
+			
+			var newElephant = elephant.cloneNode(true);
+			newElephant.removeAttribute('id');
+			span.appendChild(newElephant);
+			
+			span.appendChild(document.createElement('SPAN')).textContent = step;
+			
+			span.classList.add('pal' + pal);
+			span.classList.add(dir ? 'r2l' : 'l2r');
+			span.x = x;
+			span.y = y;
+			span.addEventListener('click', cellClickHandler);
+        }
+    }
+	updateRev();
+}
+
+function paint(x, y, nextColNum)
+{
+    var colNum = getColNum(x, y);
+    if (colNum == null)
+    {
+        setColNum(x, y, nextColNum);
+        dir = getDir(x, y);
+        step = getStep(x, y);
+        if (dir)
+            var x2 = (x - step + 10) % 10;
+        else
+            var x2 = (x + step) % 10;
+        colNum = paint(x2, y, nextColNum);
+        setColNum(x, y, colNum);
+    }
+    return colNum;
+}
+
+function set(x, y, prop, value)
+{
+	var index = (x + 10) % 10 + (y + 10) % 10 * 10;
+    t[index][prop] = value;
+}
+
+function setBlacked(x, y, blacked)
+{
+    set(x, y, 'blacked', blacked);
+}
+
+function setColNum(x, y, colNum)
+{
+    set(x, y, 'colNum', colNum);
+}
+
+function setPal(x, y, pal)
+{
+    set(x, y, 'pal', pal);
+}
+
+function updateRev()
+{
+	var revStr = '';
+    for (var y = 0; y < 10; ++y)
+    {
+        for (var x = 0; x < 10; ++x)
+        {
+            var dir = getDir(x, y);
+            var pal = getPal(x, y);
+			var blacked = getBlacked(x, y);
+			revStr += (blacked ? '??' : 'RYGM'[pal] + (dir ? '<' : '>')) + ' ';
+        }
+		revStr = revStr.slice(0, -1) + '\n';
+    }
+	rev.textContent = revStr;
+}
+
+var t = [];
+
+window.onload = make;
+
+</script>
+<style>
+#controls { padding: 1em; }
+#elephant { display: none; }
+#pic { border: 1px solid black; display: inline-block; padding: 10px; }
+#pic>*>*
+{
+    display: table-cell;
+    height: 60px;
+	position: relative;
+    text-align: center;
+    vertical-align: middle;
+    width: 60px;
+}
+#pic>*>*.blacked { background-color: black; }
+#pic>*>*.blacked>svg { visibility: hidden; }
+#pic>*>*>span
+{
+	bottom: 0;
+	color: white;
+    font-size: 25px;
+	left: 0;
+	line-height: 60px;
+	position: absolute;
+	right: 0;
+	top: 0;
+}
+#pic>*>*>svg { height: 45px; vertical-align: middle; width: 60px; }
+#pic:not(.withCount)>*>*>span { visibility: hidden; }
+#rev { background: #bbb; color: black; display: inline-block; font-family: monospace; padding: 1em; white-space: pre; }
+.pal0 { background-color: #f77; }
+.pal0 svg { fill: #800; }
+.pal1 { background-color: #ff7; }
+.pal1 svg { fill: #880; }
+.pal2 { background-color: #7f7; }
+.pal2 svg { fill: #080; }
+.pal3 { background-color: #f7f; }
+.pal3 svg { fill: #808; }
+.r2l svg { filter: FlipH; transform: scaleX(-1); -webkit-transform: scaleX(-1); }
+</style>
+<title>Elephant Puzzle Maker</title>
+</head>
+<body>
+<svg id="elephant" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 480">
+    <path stroke-linejoin="round" d="m580.59 326.38c19.588-17.54 53.706-55.547 50.119-134.48-3.5862-78.934-46.268-152.02-83.279-162.25-37.014-10.232-187.07-64.317-209.94 51.161-22.868 115.48 70.23 153.48 93.929 149.1 23.697-4.384 47.616-65.777 47.616-65.777s-8.1906 67.24-37.378 74.55c-29.187 7.3073-102.82-4.3863-123.54-89.167s21.794-108.17-6.6522-115.48c-37.89-9.735-138.82-23.388-217.63 36.544-78.809 59.932-103.08 175.41-82.528 163.72 20.554-11.694 28.668-49.699 34.147-21.926 5.4791 27.773 27.151 71.626 46.223 89.166 19.071 17.54-8.4121 124.25-3.3316 143.25 5.0805 19.003 34.866 24.85 57.358 24.85 22.491 0 73.163 1.4629 69.622-14.617-3.5415-16.08-21.739-45.314-24.539-76.01-2.8004-30.697 17.82-40.93 26.321-39.467 8.501 1.4606 13.26 14.106 48.458 14.617 33.745 0.48755 33.272-10.233 47.395-8.7703 14.124 1.4606 23.556 23.387 24.75 49.698 1.1946 26.313-7.648 48.239-6.9848 62.856 0.66547 14.617 102.01 17.54 105.43 0 3.421-17.54-14.51-40.93-15.506-62.856-0.99594-21.924-0.17871-65.777 25.999-77.471 26.177-11.694 53.096-38.006 70.764-20.466 17.665 17.543-43.932 54.086-43.876 86.243 0.053619 32.16 28.29 65.78 35.319 65.78 7.0296 0 36.15-8.7701 36.76-26.313 0.60742-17.54-23.024-11.694-23.953-32.157-0.92889-20.464 38.53-46.05 58.929-64.317z" fill-rule="evenodd" stroke-width="73"/>
+</svg>
+<div id="controls">
+<label>Show follower count: <input type="checkbox"/></label>
+</div>
+<div>
+<div id="pic"></div>
+</div>
+<div id="rev"></div>
+</body>
